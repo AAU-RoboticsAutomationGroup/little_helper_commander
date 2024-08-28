@@ -248,8 +248,8 @@ class Navigator(BasicNavigator):
             if line_config_overlap == 0: 
                 cost = np.sqrt(np.sum((initial_position-known_intersect)**2)) + line_config_overlap
                 # use this plotting for debug in case os weird waypoint selection 
-                plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8))
-                plt.show()
+                # plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8))
+                # plt.show()
                 costs.append(cost)
             else:
                 # plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8))
