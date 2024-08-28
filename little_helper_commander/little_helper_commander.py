@@ -16,6 +16,7 @@ from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import PoseStamped
 from rosgraph_msgs.msg import Clock
 from rclpy.time import Time
+from nav2_msgs.action import SmoothPath 
 
 from tf2_ros import StaticTransformBroadcaster
 from tf2_ros import TransformListener
@@ -80,7 +81,7 @@ class Navigator(BasicNavigator):
         update the tranform of the child frame at a fixed rate 
         """
         try: 
-            tf_stamped = self.tf_buffer.lookup_transform(self.child_frame_id, self.parent_frame_id, rclpy.time.Time())
+            tf_stamped = self.tf_buffer.lookup_transform(self.parent_frame_id, self.child_frame_id, rclpy.time.Time())
             # print(f"transform recived \n ----- \n{self.cast_tf_matrix(tf_stamped.transform)} \n -----")
             self.latest_tf = tf_stamped
         except Exception as e:
@@ -302,6 +303,19 @@ class Navigator(BasicNavigator):
         return waypoint
 
 
+    def publish_path(self, path, path_name):
+        path_publisher = self.create_subscription()
+
+    def snip_grasping_path(self, pre_grasp_waypoint, post_grasp_waypoint, path):
+        for pose in path:
+            distance_to_pre_grasp_point = 1
+            distance_to_post_grasp_point = 1
+
+            pass 
+        pass 
+
+
+
 
 
 
@@ -334,12 +348,19 @@ def main():
     goal_waypoint = navigator.cast_waypoint(x,y,z,w)
     waypoints.append(goal_waypoint)
     
-    navigator.goThroughPoses(waypoints, behavior_tree=navigator.behavior_tree_path)
+    # navigator.goThroughPoses(waypoints, behavior_tree=navigator.behavior_tree_path)
     
+    path = navigator.getPathThroughPoses(navigator.initial_pose, waypoints)
+    
+    # navigator.get_logger().info(f"path computed:{path}")
+    
+    smoothed_path = navigator.smoothPath(path)
+
+    # Follow path
+    navigator.followPath(smoothed_path)
+
     i = 0
     while not navigator.isTaskComplete():
-        # print(navigator.get_transform("map","item"))
-
         ################################################
         #
         # Implement some code here for your application!
@@ -347,20 +368,28 @@ def main():
         ################################################
 
         # Do something with the feedback
-        i = i + 1
+        i += 1
         feedback = navigator.getFeedback()
         if feedback and i % 5 == 0:
-            print('Estimated time of arrival: ' + '{0:.0f}'.format(
-                  Duration.from_msg(feedback.estimated_time_remaining).nanoseconds / 1e9)
-                  + ' seconds.')
+            print('Estimated distance remaining to goal position: ' +
+                  '{0:.3f}'.format(feedback.distance_to_goal) +
+                  '\nCurrent speed of the robot: ' +
+                  '{0:.3f}'.format(feedback.speed))
 
-            # Some navigation timeout to demo cancellation
-            if Duration.from_msg(feedback.navigation_time) > Duration(seconds=600.0):
-                navigator.cancelTask()
+    # Do something depending on the return code
+    result = navigator.getResult()
+    if result == TaskResult.SUCCEEDED:
+        print('Goal succeeded!')
+    elif result == TaskResult.CANCELED:
+        print('Goal was canceled!')
+    elif result == TaskResult.FAILED:
+        print('Goal failed!')
+    else:
+        print('Goal has an invalid return status!')
 
-            # Some navigation request change to demo preemption
+    navigator.lifecycleShutdown()
 
-    
+    exit(0)
 
 
 

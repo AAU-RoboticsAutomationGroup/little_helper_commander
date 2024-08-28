@@ -39,7 +39,7 @@ class ItemTFBroadcaster(Node):
 
     def timer_callback(self):
         try: 
-            tf_stamped = self.tf_buffer.lookup_transform(self.child_frame_id, self.parent_frame_id, rclpy.time.Time())
+            tf_stamped = self.tf_buffer.lookup_transform(self.parent_frame_id, self.child_frame_id, rclpy.time.Time())
             # print(f"transform recived \n ----- \n{self.cast_tf_matrix(tf_stamped.transform)} \n -----")
             self.item_tf = tf_stamped
         except Exception as e:
