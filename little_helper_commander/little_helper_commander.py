@@ -3,6 +3,7 @@
 #std python packages 
 from typing import List
 import numpy as np 
+import time 
 
 #ros2 packages
 from rclpy.duration import Duration
@@ -335,6 +336,7 @@ def main():
     item_tf = navigator.get_latest_tf()
     
     while not navigator.costmap:
+        time.sleep(0.5)
         navigator.waitUntilNav2Active()
 
     grasping_waypoints =navigator.generate_waypoints(initial_position=np.array([navigator.initial_pose_l[0], navigator.initial_pose_l[1]]),
