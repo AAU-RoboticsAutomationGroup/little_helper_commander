@@ -18,6 +18,8 @@ from geometry_msgs.msg import PoseStamped
 from rosgraph_msgs.msg import Clock
 from rclpy.time import Time
 from nav2_msgs.action import SmoothPath 
+from nav_msgs.msg import Path 
+import std_msgs.msg
 
 from tf2_ros import StaticTransformBroadcaster
 from tf2_ros import TransformListener
@@ -48,6 +50,8 @@ class Navigator(BasicNavigator):
         self.create_subscription(OccupancyGrid, "global_costmap/costmap", self.costmap_callback, 10)
         
         
+        self.grasping_path_publisher = self.create_publisher(Path, 'grasping_path', 10)
+
         self.navigation_frame_id = "map"
 
 
@@ -58,8 +62,18 @@ class Navigator(BasicNavigator):
         self.parent_frame_id = "map"
         self.child_frame_id = "item"
 
-        self.latest_tf = False
+        self.robot_base_frame_id = "little_helper/chassis"
+        
+        self.pre_grasp_reached = False
+        self.post_grasp_reached = False
 
+        self.pre_grasp_reached_state_publisher = self.create_publisher(std_msgs.msg.Bool, "pre_grasp_state", 10)
+        self.post_grasp_reached_state_publisher = self.create_publisher(std_msgs.msg.Bool, "post_grasp_state", 10)
+
+        self.grasping_waypoints = False
+
+        self.latest_tf = False
+    
         self.costmap = False
     
     def clock_callback(self, time_msg):
@@ -308,16 +322,84 @@ class Navigator(BasicNavigator):
         return waypoint
 
 
-    def publish_path(self, path, path_name):
-        path_publisher = self.create_subscription()
+
 
     def snip_grasping_path(self, pre_grasp_waypoint, post_grasp_waypoint, path):
-        for pose in path:
-            distance_to_pre_grasp_point = 1
-            distance_to_post_grasp_point = 1
+        def distance(a, b):
+            return np.sum(np.sqrt((a-b)**2))
+        pre_grasp_coor = np.array([pre_grasp_waypoint.pose.position.x, pre_grasp_waypoint.pose.position.y])
 
-            pass 
-        pass 
+        post_grasp_coor = np.array([post_grasp_waypoint.pose.position.x, post_grasp_waypoint.pose.position.y])
+
+        pre_grasp_reached = False 
+        post_grasp_reaced = False
+        
+        return_path = Path() 
+        return_path.header = path.header
+
+        self.get_logger().info(f"{path.poses}")
+
+        for pose in path.poses:
+            path_point_coor = np.array([pose.pose.position.x, pose.pose.position.y])
+            distance_to_pre_grasp = distance(path_point_coor, pre_grasp_coor)
+            distance_to_post_grasp = distance(path_point_coor, post_grasp_coor)
+            self.get_logger().info(f"distanses pre: {distance_to_pre_grasp}, post: {distance_to_post_grasp}")
+            if distance_to_pre_grasp < 0.2:
+                pre_grasp_reached = True 
+            if distance_to_post_grasp < 0.2:
+                post_grasp_reaced = True
+
+            if pre_grasp_reached and not post_grasp_reaced:
+                return_path.poses.append(pose)
+                self.get_logger().info(f"appending to grasping_path")
+         
+        return return_path 
+    
+    def initiate_path_position_state_publisher(self):
+        self.robot_state_time = self.create_timer(0.1, self.robot_path_state_timer_callback)
+
+        
+    def robot_path_state_timer_callback(self):
+        def distance(a, b):
+            return np.sum(np.sqrt((a-b)**2))
+        
+        grasping_waypoints = self.grasping_waypoints
+
+        try:
+            robot_position = self.tf_buffer.lookup_transform(self.parent_frame_id, self.robot_base_frame_id, rclpy.time.Time())
+            robot_coor = np.array([robot_position.transform.translation.x, robot_position.transform.translation.y])
+            pre_grasp_coor = np.array([grasping_waypoints[0].pose.position.x, grasping_waypoints[0].pose.position.y])
+            post_grasp_coor = np.array([grasping_waypoints[1].pose.position.x, grasping_waypoints[1].pose.position.y])
+
+            distance_to_pre_grasp = distance(robot_coor, pre_grasp_coor)
+            distance_to_post_grasp = distance(robot_coor, post_grasp_coor)
+            if distance_to_pre_grasp < 0.4:
+                self.pre_grasp_reached = True 
+            if distance_to_post_grasp < 0.4:
+                self.post_grasp_reaced = True
+            
+            self.get_logger().info(f"{distance_to_pre_grasp}")
+            pre_grasp_msg = std_msgs.msg.Bool()
+            pre_grasp_msg.data = self.pre_grasp_reached
+
+            post_grasp_msg = std_msgs.msg.Bool()
+            post_grasp_msg.data = self.post_grasp_reached
+
+
+
+            self.pre_grasp_reached_state_publisher.publish(pre_grasp_msg)
+            self.post_grasp_reached_state_publisher.publish(post_grasp_msg)
+
+
+
+        
+
+
+
+        except Exception as e: 
+            self.get_logger().warn(e)
+
+
 
 
 
@@ -335,7 +417,7 @@ def main():
 
     item_tf = navigator.get_latest_tf()
     
-    while not navigator.costmap:
+    while type(navigator.costmap) == bool:
         time.sleep(0.5)
         navigator.waitUntilNav2Active()
 
@@ -344,7 +426,7 @@ def main():
                                                      costmap= navigator.costmap,
                                                      goal_pose= np.array([navigator.goal_pose[0], navigator.goal_pose[1]])
                                                      )
-
+    navigator.grasping_waypoints=grasping_waypoints
     navigator.get_logger().info(f"generated the waypoints: \n{grasping_waypoints}")
     waypoints = []
 
@@ -358,11 +440,20 @@ def main():
     
     # navigator.goThroughPoses(waypoints, behavior_tree=navigator.behavior_tree_path)
     
+
     path = navigator.getPathThroughPoses(navigator.initial_pose, waypoints)
     
     # navigator.get_logger().info(f"path computed:{path}")
     
     smoothed_path = navigator.smoothPath(path)
+
+    grasping_path = navigator.snip_grasping_path(grasping_waypoints[0], grasping_waypoints[1], smoothed_path)
+   
+    navigator.initiate_path_position_state_publisher()
+
+    navigator.grasping_path_publisher.publish(grasping_path)
+
+    # navigator.publish_path(grasping_path, 'grasping_path')
 
     # Follow path
     navigator.followPath(smoothed_path)
@@ -379,6 +470,7 @@ def main():
         i += 1
         feedback = navigator.getFeedback()
         if feedback and i % 5 == 0:
+            print(f"raw feedback {feedback}")
             print('Estimated distance remaining to goal position: ' +
                   '{0:.3f}'.format(feedback.distance_to_goal) +
                   '\nCurrent speed of the robot: ' +
@@ -395,9 +487,6 @@ def main():
     else:
         print('Goal has an invalid return status!')
 
-    navigator.lifecycleShutdown()
-
-    exit(0)
 
 
 

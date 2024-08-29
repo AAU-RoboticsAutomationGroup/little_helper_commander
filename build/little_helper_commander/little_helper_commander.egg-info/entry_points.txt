@@ -1,4 +1,0 @@
-[console_scripts]
-commander = little_helper_commander.little_helper_commander:main
-item_tf_broadcaster = little_helper_commander.item_tf_broadcaster:main
-
