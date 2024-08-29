@@ -1,0 +1,44 @@
+running egg_info
+creating build/little_helper_commander/little_helper_commander.egg-info
+writing build/little_helper_commander/little_helper_commander.egg-info/PKG-INFO
+writing dependency_links to build/little_helper_commander/little_helper_commander.egg-info/dependency_links.txt
+writing entry points to build/little_helper_commander/little_helper_commander.egg-info/entry_points.txt
+writing requirements to build/little_helper_commander/little_helper_commander.egg-info/requires.txt
+writing top-level names to build/little_helper_commander/little_helper_commander.egg-info/top_level.txt
+writing manifest file 'build/little_helper_commander/little_helper_commander.egg-info/SOURCES.txt'
+reading manifest file 'build/little_helper_commander/little_helper_commander.egg-info/SOURCES.txt'
+writing manifest file 'build/little_helper_commander/little_helper_commander.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/a/work/lh_commander_ws/src/little_helper_commander/build/little_helper_commander/build
+creating /home/a/work/lh_commander_ws/src/little_helper_commander/build/little_helper_commander/build/lib
+creating /home/a/work/lh_commander_ws/src/little_helper_commander/build/little_helper_commander/build/lib/little_helper_commander
+copying little_helper_commander/little_helper_commander.py -> /home/a/work/lh_commander_ws/src/little_helper_commander/build/little_helper_commander/build/lib/little_helper_commander
+copying little_helper_commander/tester.py -> /home/a/work/lh_commander_ws/src/little_helper_commander/build/little_helper_commander/build/lib/little_helper_commander
+copying little_helper_commander/item_tf_broadcaster.py -> /home/a/work/lh_commander_ws/src/little_helper_commander/build/little_helper_commander/build/lib/little_helper_commander
+copying little_helper_commander/__init__.py -> /home/a/work/lh_commander_ws/src/little_helper_commander/build/little_helper_commander/build/lib/little_helper_commander
+running install
+running install_lib
+creating /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/lib/python3.10/site-packages/little_helper_commander
+copying /home/a/work/lh_commander_ws/src/little_helper_commander/build/little_helper_commander/build/lib/little_helper_commander/little_helper_commander.py -> /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/lib/python3.10/site-packages/little_helper_commander
+copying /home/a/work/lh_commander_ws/src/little_helper_commander/build/little_helper_commander/build/lib/little_helper_commander/tester.py -> /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/lib/python3.10/site-packages/little_helper_commander
+copying /home/a/work/lh_commander_ws/src/little_helper_commander/build/little_helper_commander/build/lib/little_helper_commander/item_tf_broadcaster.py -> /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/lib/python3.10/site-packages/little_helper_commander
+copying /home/a/work/lh_commander_ws/src/little_helper_commander/build/little_helper_commander/build/lib/little_helper_commander/__init__.py -> /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/lib/python3.10/site-packages/little_helper_commander
+byte-compiling /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/lib/python3.10/site-packages/little_helper_commander/little_helper_commander.py to little_helper_commander.cpython-310.pyc
+byte-compiling /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/lib/python3.10/site-packages/little_helper_commander/tester.py to tester.cpython-310.pyc
+byte-compiling /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/lib/python3.10/site-packages/little_helper_commander/item_tf_broadcaster.py to item_tf_broadcaster.cpython-310.pyc
+byte-compiling /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/lib/python3.10/site-packages/little_helper_commander/__init__.py to __init__.cpython-310.pyc
+running install_data
+creating /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/share/ament_index
+creating /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/share/ament_index/resource_index
+creating /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/share/ament_index/resource_index/packages
+copying resource/little_helper_commander -> /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/share/ament_index/resource_index/packages
+copying package.xml -> /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/share/little_helper_commander
+creating /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/share/little_helper_commander/launch
+copying launch/launch_commander.launch.py -> /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/share/little_helper_commander/launch
+running install_egg_info
+Copying build/little_helper_commander/little_helper_commander.egg-info to /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/lib/python3.10/site-packages/little_helper_commander-0.0.0-py3.10.egg-info
+running install_scripts
+Installing commander script to /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/lib/little_helper_commander
+Installing item_tf_broadcaster script to /home/a/work/lh_commander_ws/src/little_helper_commander/install/little_helper_commander/lib/little_helper_commander
+writing list of installed files to '/home/a/work/lh_commander_ws/src/little_helper_commander/build/little_helper_commander/install.log'
