@@ -24,8 +24,10 @@ from tf2_ros import TransformBroadcaster
 import tf2_ros
 from tf2_msgs.msg import TFMessage
 from geometry_msgs.msg import TransformStamped
-
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except Exception as e:
+    print(e)
 
 class Navigator(BasicNavigator):
     def __init__(self, node_name='littel_helper_navigator', namespace=''):
