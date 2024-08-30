@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 #std python packages 
+from locale import Error
+from logging import raiseExceptions
 from typing import List
 import numpy as np 
 import time 
@@ -48,8 +50,7 @@ class Navigator(BasicNavigator):
         self.behavior_tree_path = self.get_parameter("behavior_tree_path").value
         self.create_subscription(Clock, 'clock', self.clock_callback, 10)
         self.create_subscription(OccupancyGrid, "global_costmap/costmap", self.costmap_callback, 10)
-        
-        
+       
         self.grasping_path_publisher = self.create_publisher(Path, 'grasping_path', 10)
 
         self.navigation_frame_id = "map"
@@ -62,7 +63,9 @@ class Navigator(BasicNavigator):
         self.parent_frame_id = "map"
         self.child_frame_id = "item"
 
-        self.robot_base_frame_id = "little_helper/chassis"
+        # self.robot_base_frame_id = "little_helper/chassis"
+
+        self.robot_base_frame_id = "base_link"
         
         self.pre_grasp_reached = False
         self.post_grasp_reached = False
@@ -92,8 +95,8 @@ class Navigator(BasicNavigator):
             time_msg = Time(seconds=self.time.clock.sec, nanoseconds=self.time.clock.nanosec) 
             return time_msg.to_msg()
         except Exception as e: 
-            self.get_logger().warn(f"the clock topic probaly dont exist giving the error {e}, defaulting to using internal clock")
-            return self.get_clock().now().to_msg()
+            self.get_logger().warn(f"the clock topic probaly dont exist giving the error {e}, defaulting to using zero as time")
+            return rclpy.time.Time().to_msg()
 
     def timer_callback(self):
         """
@@ -177,6 +180,7 @@ class Navigator(BasicNavigator):
 
         self.costmap = np.vstack([self.costmap, costmap_x_position, costmap_y_position]).reshape((3, msg.info.height, msg.info.width)).transpose(1,2,0)
         print(self.costmap.shape)
+        self.get_logger().info("cost map recived")
         # plt.imshow(self.costmap[:,:,1], 'plasma')
         # plt.show()
         np.save("costmap", self.costmap)
@@ -192,17 +196,17 @@ class Navigator(BasicNavigator):
         # find the point on the radius that is closest to the specified initial_position and does - 
         # and the line generated from this point does not cross the cspace 
         
-        trial_resolution = 361 #the amount of points on the radius to try 
+        trial_resolution = 50 #the amount of points on the radius to try 
 
-        attack_angle = 200 # the angle to the line perpendicular to the tangent of the trial value,
+        attack_angle = 220 # the angle to the line perpendicular to the tangent of the trial value,
 
         radius = 2 # the radius from the item to generate trial points 
 
-        cspace_radius = radius + 3 # the area to look for overlapping with cspace 
+        cspace_radius = radius + 0.1 # the area to look for overlapping with cspace 
         
         pickup_path_length = 3 # the pickup_path_length ie how far the robot should go in a straight line 
 
-        path_line_with = 0.2 # the with of the line used to check for overlapping with the cspace 
+        path_line_with = 0.1 # the with of the line used to check for overlapping with the cspace 
 
         points_on_radius = np.linspace(0,359,trial_resolution)
 
@@ -222,8 +226,8 @@ class Navigator(BasicNavigator):
 
         selected_cspace_idx = (costmap[:,:,1] - item_position[0])**2 + (costmap[:,:,2] - item_position[1])**2 <= cspace_radius**2 
         
-        # plt.imshow(selected_cspace_idx)
-        # plt.show()
+        plt.imshow(selected_cspace_idx)
+        plt.show()
         self.get_logger().info(f"item_position {item_position}")
         
         print(selected_cspace_idx.shape)
@@ -268,14 +272,18 @@ class Navigator(BasicNavigator):
             if line_config_overlap == 0: 
                 cost = np.sqrt(np.sum((initial_position-known_intersect)**2)) + line_config_overlap
                 # use this plotting for debug in case os weird waypoint selection 
-                # plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8))
-                # plt.show()
+                plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8))
+                plt.show()
                 costs.append(cost)
             else:
-                # plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8))
-                # plt.show()
+                plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8), cmap="plasma")
+                plt.show()
 
                 costs.append(np.inf)
+            
+        if (np.array(costs)==np.inf).all():
+            raise Error("no viable grasping paths found :(")
+
 
         print(np.array(costs))
 
@@ -442,7 +450,7 @@ def main():
     
 
     path = navigator.getPathThroughPoses(navigator.initial_pose, waypoints)
-    
+    # path = navigator.getPathThroughPoses(navigator.initial_pose, [navigator.cast_waypoint(1.0, 0.5, 0.0, 1.0), navigator.cast_waypoint(2.0, 0.5, 0.0, 1.0)]) 
     # navigator.get_logger().info(f"path computed:{path}")
     
     smoothed_path = navigator.smoothPath(path)
