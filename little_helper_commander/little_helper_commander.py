@@ -198,26 +198,26 @@ class Navigator(BasicNavigator):
         
         trial_resolution = 50 #the amount of points on the radius to try 
 
-        attack_angle = 220 # the angle to the line perpendicular to the tangent of the trial value,
+        attack_angle = 195 # the angle to the line perpendicular to the tangent of the trial value,
 
-        radius = 2 # the radius from the item to generate trial points 
+        radius = 1.2 # the radius from the item to generate trial points 
 
         cspace_radius = radius + 0.1 # the area to look for overlapping with cspace 
         
         pickup_path_length = 3 # the pickup_path_length ie how far the robot should go in a straight line 
 
-        path_line_with = 0.1 # the with of the line used to check for overlapping with the cspace 
+        path_line_with = 0.03 # the with of the line used to check for overlapping with the cspace 
 
         points_on_radius = np.linspace(0,359,trial_resolution)
 
         initial_headings = points_on_radius+attack_angle
 
-        trial_values = np.c_[points_on_radius, initial_headings]
-        
-  
+        trial_values = np.c_[points_on_radius, initial_headings] 
 
-        # plt.imshow(costmap[:,:,0])
-        # plt.show()       
+        costmap_threshold = 80
+
+        plt.imshow(costmap[:,:,0])
+        plt.show()       
         # plt.imshow(costmap[:,:,1])
         # plt.show()
         # 
@@ -236,7 +236,6 @@ class Navigator(BasicNavigator):
         costmap_reduced = np.zeros_like(costmap)
         costmap_reduced[selected_cspace_idx] = costmap[selected_cspace_idx]
 
-        # costmap[selected_cspace_idx[1],selected_cspace_idx[0],:] 
                
         print(costmap_reduced.shape)
         costs = []
@@ -262,7 +261,7 @@ class Navigator(BasicNavigator):
             line_idx = line_idx_1 == line_idx_2
 
             
-            costmap_idx = costmap_reduced[:,:,0] > 0 
+            costmap_idx = costmap_reduced[:,:,0] > costmap_threshold 
 
             # plt.imshow(costmap_idx.astype(np.uint8) + line_idx.astype(np.uint8) == 1)
             # plt.show()
@@ -392,8 +391,6 @@ class Navigator(BasicNavigator):
 
             post_grasp_msg = std_msgs.msg.Bool()
             post_grasp_msg.data = self.post_grasp_reached
-
-
 
             self.pre_grasp_reached_state_publisher.publish(pre_grasp_msg)
             self.post_grasp_reached_state_publisher.publish(post_grasp_msg)
