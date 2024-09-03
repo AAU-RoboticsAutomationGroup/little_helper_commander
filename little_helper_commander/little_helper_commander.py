@@ -198,15 +198,19 @@ class Navigator(BasicNavigator):
         
         trial_resolution = 50 #the amount of points on the radius to try 
 
-        attack_angle = 195 # the angle to the line perpendicular to the tangent of the trial value,
+        distance_to_center = 0.7
 
-        radius = 1.2 # the radius from the item to generate trial points 
+        radius = 1.5 # the radius from the item to generate trial points 
+
+        attack_angle = np.arcsin(distance_to_center/radius)*180/np.pi + 180 # the angle to the line perpendicular to the tangent of the trial value,
+
+        self.get_logger().info(f"attack angle = {attack_angle}")
 
         cspace_radius = radius + 0.1 # the area to look for overlapping with cspace 
         
         pickup_path_length = 3 # the pickup_path_length ie how far the robot should go in a straight line 
 
-        path_line_with = 0.03 # the with of the line used to check for overlapping with the cspace 
+        path_line_with = 0.05 # the with of the line used to check for overlapping with the cspace 
 
         points_on_radius = np.linspace(0,359,trial_resolution)
 
