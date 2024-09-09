@@ -198,9 +198,9 @@ class Navigator(BasicNavigator):
         
         trial_resolution = 50 #the amount of points on the radius to try 
 
-        distance_to_center = 0.7
+        distance_to_center = 0.5
 
-        radius = 1.5 # the radius from the item to generate trial points 
+        radius = 2.5 # the radius from the item to generate trial points 
 
         attack_angle = np.arcsin(distance_to_center/radius)*180/np.pi + 180 # the angle to the line perpendicular to the tangent of the trial value,
 
@@ -208,7 +208,7 @@ class Navigator(BasicNavigator):
 
         cspace_radius = radius + 0.1 # the area to look for overlapping with cspace 
         
-        pickup_path_length = 3 # the pickup_path_length ie how far the robot should go in a straight line 
+        pickup_path_length = radius*1.8 # the pickup_path_length ie how far the robot should go in a straight line 
 
         path_line_with = 0.05 # the with of the line used to check for overlapping with the cspace 
 
@@ -218,10 +218,10 @@ class Navigator(BasicNavigator):
 
         trial_values = np.c_[points_on_radius, initial_headings] 
 
-        costmap_threshold = 80
+        costmap_threshold = 70
 
-        plt.imshow(costmap[:,:,0])
-        plt.show()       
+        # plt.imshow(costmap[:,:,0])
+        # plt.show()       
         # plt.imshow(costmap[:,:,1])
         # plt.show()
         # 
@@ -230,8 +230,8 @@ class Navigator(BasicNavigator):
 
         selected_cspace_idx = (costmap[:,:,1] - item_position[0])**2 + (costmap[:,:,2] - item_position[1])**2 <= cspace_radius**2 
         
-        plt.imshow(selected_cspace_idx)
-        plt.show()
+        # plt.imshow(selected_cspace_idx)
+        # plt.show()
         self.get_logger().info(f"item_position {item_position}")
         
         print(selected_cspace_idx.shape)
@@ -272,16 +272,16 @@ class Navigator(BasicNavigator):
 
             line_config_overlap = np.sum(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8) > 1)
             
-            if line_config_overlap == 0: 
+            if line_config_overlap < 200: #allowing for some overlapping to make it more stable 
                 cost = np.sqrt(np.sum((initial_position-known_intersect)**2)) + line_config_overlap
                 # use this plotting for debug in case os weird waypoint selection 
-                plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8))
-                plt.show()
+                # plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8))
+                # plt.show()
                 costs.append(cost)
             else:
-                plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8), cmap="plasma")
-                plt.show()
-
+                # plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8), cmap="plasma")
+                # plt.show()
+                #
                 costs.append(np.inf)
             
         if (np.array(costs)==np.inf).all():
@@ -355,9 +355,9 @@ class Navigator(BasicNavigator):
             distance_to_pre_grasp = distance(path_point_coor, pre_grasp_coor)
             distance_to_post_grasp = distance(path_point_coor, post_grasp_coor)
             self.get_logger().info(f"distanses pre: {distance_to_pre_grasp}, post: {distance_to_post_grasp}")
-            if distance_to_pre_grasp < 0.2:
+            if distance_to_pre_grasp < 0.1:
                 pre_grasp_reached = True 
-            if distance_to_post_grasp < 0.2:
+            if distance_to_post_grasp < 0.1:
                 post_grasp_reaced = True
 
             if pre_grasp_reached and not post_grasp_reaced:
