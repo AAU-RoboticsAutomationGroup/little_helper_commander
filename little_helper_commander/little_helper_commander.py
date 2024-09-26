@@ -198,9 +198,9 @@ class Navigator(BasicNavigator):
         
         trial_resolution = 50 #the amount of points on the radius to try 
 
-        distance_to_center = 0.5
+        distance_to_center = 0.6
 
-        radius = 2.5 # the radius from the item to generate trial points 
+        radius = 1.5 # the radius from the item to generate trial points 
 
         attack_angle = np.arcsin(distance_to_center/radius)*180/np.pi + 180 # the angle to the line perpendicular to the tangent of the trial value,
 
@@ -218,7 +218,9 @@ class Navigator(BasicNavigator):
 
         trial_values = np.c_[points_on_radius, initial_headings] 
 
-        costmap_threshold = 70
+        line_overlap_threshold = 50
+
+        costmap_threshold = 80
 
         # plt.imshow(costmap[:,:,0])
         # plt.show()       
@@ -272,15 +274,17 @@ class Navigator(BasicNavigator):
 
             line_config_overlap = np.sum(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8) > 1)
             
-            if line_config_overlap < 200: #allowing for some overlapping to make it more stable 
+            if line_config_overlap < line_overlap_threshold: #allowing for some overlapping to make it more stable 
                 cost = np.sqrt(np.sum((initial_position-known_intersect)**2)) + line_config_overlap
                 # use this plotting for debug in case os weird waypoint selection 
-                # plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8))
-                # plt.show()
+                plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8))
+                plt.title(f"overlap with range {line_config_overlap}")
+                plt.show()
                 costs.append(cost)
             else:
-                # plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8), cmap="plasma")
-                # plt.show()
+                plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8), cmap="plasma")
+                plt.title(f"too much overlap {line_config_overlap}")
+                plt.show()
                 #
                 costs.append(np.inf)
             
