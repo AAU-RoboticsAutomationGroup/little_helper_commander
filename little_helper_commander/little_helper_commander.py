@@ -3,11 +3,13 @@
 #std python packages 
 from locale import Error
 from logging import raiseExceptions
-from typing import List
+from typing import List, cast
+from action_msgs.msg import GoalStatus
 import numpy as np 
 import time 
 
 #ros2 packages
+from rclpy.action.client import ClientGoalHandle
 from rclpy.duration import Duration
 
 from numpy.core.multiarray import array
@@ -16,10 +18,10 @@ import rclpy.time
 from rclpy.node import Node
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult 
 from nav_msgs.msg import OccupancyGrid  
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PointStamped, PoseStamped, PoseWithCovariance,  PoseWithCovarianceStamped
 from rosgraph_msgs.msg import Clock
 from rclpy.time import Time
-from nav2_msgs.action import SmoothPath 
+from nav2_msgs.action import ComputePathThroughPoses, SmoothPath 
 from nav_msgs.msg import Path 
 import std_msgs.msg
 
@@ -29,28 +31,52 @@ from tf2_ros import TransformBroadcaster
 import tf2_ros
 from tf2_msgs.msg import TFMessage
 from geometry_msgs.msg import TransformStamped
+
+from lh_interfaces 
+
+
 try:
     import matplotlib.pyplot as plt
 except Exception as e:
     print(e)
 
-class Navigator(BasicNavigator):
-    def __init__(self, node_name='littel_helper_navigator', namespace=''):
-        super().__init__(node_name, namespace)
-        
+
+
+
+
+class GraspingNavigator(Node):
+    def __init__(self, node_name='littel_helper_grasping_navigator'):
+        super().__init__(node_name) 
+
+        self.basic_navigator = BasicNavigator() 
+
         #declaring the most important parameters for now
-        self.declare_parameter("initial_pose", rclpy.Parameter.Type.DOUBLE_ARRAY) #[x, y, qw, qz]
-        self.declare_parameter("item_position", rclpy.Parameter.Type.DOUBLE_ARRAY) #[x, y, z]
-        self.declare_parameter("goal_pose", rclpy.Parameter.Type.DOUBLE_ARRAY) #[x, y, qw, qz]
+        # self.declare_parameter("initial_pose", rclpy.Parameter.Type.DOUBLE_ARRAY) #[x, y, qw, qz]
+        # self.declare_parameter("item_position", rclpy.Parameter.Type.DOUBLE_ARRAY) #[x, y, z]
+        # self.declare_parameter("goal_pose", rclpy.Parameter.Type.DOUBLE_ARRAY) #[x, y, qw, qz]
         self.declare_parameter("behavior_tree_path", rclpy.Parameter.Type.STRING)
 
-        self.initial_pose_l = self.get_parameter("initial_pose").value
-        self.goal_pose = self.get_parameter("goal_pose").value
-        self.item_position = self.get_parameter("item_position").value
+        # self.initial_pose_l = self.get_parameter("initial_pose").value
+        # self.goal_pose = self.get_parameter("goal_pose").value
+        # self.item_position = self.get_parameter("item_position").value
         self.behavior_tree_path = self.get_parameter("behavior_tree_path").value
         self.create_subscription(Clock, 'clock', self.clock_callback, 10)
         self.create_subscription(OccupancyGrid, "global_costmap/costmap", self.costmap_callback, 10)
-       
+        
+        self.create_subscription(PoseStamped, "grasping_goal_pose", self.goal_pose_callback, 10)
+        self.create_subscription(PointStamped, "item_position", self.item_position_callback, 10)
+        
+        self.create_subscription(PoseWithCovarianceStamped, "amcl_pose", self.amcl_callback, 10)
+        self.amcl_pose = PoseWithCovarianceStamped()
+        self.initial_pose = PoseStamped()
+        self.amcl_recived = False 
+
+
+        self.item_position = np.ndarray(2)
+        self.item_recived = False
+        self.goal_pose = np.ndarray(4)
+        
+
         self.grasping_path_publisher = self.create_publisher(Path, 'grasping_path', 10)
 
         self.navigation_frame_id = "map"
@@ -63,6 +89,7 @@ class Navigator(BasicNavigator):
         self.parent_frame_id = "map"
         self.child_frame_id = "item"
 
+
         # self.robot_base_frame_id = "little_helper/chassis"
 
         self.robot_base_frame_id = "base_link"
@@ -73,12 +100,35 @@ class Navigator(BasicNavigator):
         self.pre_grasp_reached_state_publisher = self.create_publisher(std_msgs.msg.Bool, "pre_grasp_state", 10)
         self.post_grasp_reached_state_publisher = self.create_publisher(std_msgs.msg.Bool, "post_grasp_state", 10)
 
+        self.grasping_path_state_publisher = self.create_publisher()
+
         self.grasping_waypoints = False
 
         self.latest_tf = False
     
-        self.costmap = False
-    
+        self.costmap = np.array([False])
+        self.costmap_recived = False
+        
+        self.generated_path = None
+        self.have_path_been_generated = False
+
+        self.basic_navigator.waitUntilNav2Active()
+
+    def amcl_callback(self, amcl_msg:PoseWithCovarianceStamped):
+        self.amcl_pose = amcl_msg
+        self.amcl_recived = True
+        self.initial_pose.pose.position = self.amcl_pose.pose.pose.position
+        self.initial_pose.pose.orientation = self.amcl_pose.pose.pose.orientation
+        
+
+        self.get_logger().info(f"amcl pose recieved, {self.amcl_pose.pose.pose.position.x}, {self.amcl_pose.pose.pose.position.y} ")
+
+
+    def plan_callback(self, plan_msg):
+        self.get_logger().info("plan recieved")
+        self.path = plan_msg
+
+
     def clock_callback(self, time_msg):
         """
         when a new time is recived from the clock topic, update the time variable 
@@ -97,6 +147,66 @@ class Navigator(BasicNavigator):
         except Exception as e: 
             self.get_logger().warn(f"the clock topic probaly dont exist giving the error {e}, defaulting to using zero as time")
             return rclpy.time.Time().to_msg()
+
+    def goal_pose_callback(self, goal_msg):
+        """
+        callback for when goal pose recived, updates state value, and initializes the pickup
+        """
+
+        self.get_logger().info("goal pose recieved")
+
+        self.goal_pose = self.cast_waypoint(goal_msg.pose.position.x,
+                                            goal_msg.pose.position.y,
+                                            goal_msg.pose.orientation.w,
+                                            goal_msg.pose.orientation.z)
+
+        if (not self.costmap_recived and not self.item_recived):
+            print(f"costmap or item position missing, \ncostmap: \n{self.costmap} \nitem_position: \n{self.item_position}")
+            return 
+
+        self.grasping_waypoints = self.generate_waypoints()
+
+        waypoints=[]
+
+        for waypoint in self.grasping_waypoints:
+            waypoints.append(waypoint)
+
+        waypoints.append(self.goal_pose)
+
+        self.get_logger().info("waypoints generated")
+               
+        # initial_pose = self.initial_pose 
+        # self.get_logger().info(f"initial pose: {self.initial_pose.pose.position.x} {self.initial_pose.pose.position.y} \nwaypoints: {waypoints}")
+
+        path = self.basic_navigator.getPathThroughPoses(self.initial_pose, waypoints)
+
+        path = self.basic_navigator.smoothPath(path)
+
+        grasping_path = self.snip_grasping_path(waypoints[0], waypoints[1], path)
+
+        self.grasping_path = grasping_path
+
+        self.grasping_path_publisher.publish(grasping_path)
+        
+        # creates a timer callback 
+        self.initiate_path_position_state_publisher()
+
+        self.get_logger().info("path generated !!!")
+
+        self.basic_navigator.followPath(path)
+
+    
+    def item_position_callback(self, item_msg):
+        """
+        callback for when item position recived, updates state value
+        """
+        self.item_position[0] = item_msg.point.x
+        self.item_position[1] = item_msg.point.y
+        # self.item_position[2] = item_msg.point.z 
+        
+        self.item_recived = True 
+
+
 
     def timer_callback(self):
         """
@@ -179,16 +289,17 @@ class Navigator(BasicNavigator):
         # plt.show()
 
         self.costmap = np.vstack([self.costmap, costmap_x_position, costmap_y_position]).reshape((3, msg.info.height, msg.info.width)).transpose(1,2,0)
-        print(self.costmap.shape)
+        # print(self.costmap.shape)
         self.get_logger().info("cost map recived")
         # plt.imshow(self.costmap[:,:,1], 'plasma')
         # plt.show()
         np.save("costmap", self.costmap)
-
+        
+        self.costmap_recived = True
 
         
 
-    def generate_waypoints(self, initial_position : np.ndarray, goal_pose : np.ndarray, item_position : np.ndarray, costmap : np.ndarray) -> List[PoseStamped]:
+    def generate_waypoints(self) -> List[PoseStamped]:
         """
         function to generate waypoints, uses the costmap and the initial pose to find the best graasping waypoints 
         """
@@ -196,6 +307,11 @@ class Navigator(BasicNavigator):
         # find the point on the radius that is closest to the specified initial_position and does - 
         # and the line generated from this point does not cross the cspace 
         
+        costmap = self.costmap
+        item_position = self.item_position
+        initial_position = np.array([self.initial_pose.pose.position.x, self.initial_pose.pose.position.y])
+
+
         trial_resolution = 50 #the amount of points on the radius to try 
 
         distance_to_center = 0.6
@@ -236,14 +352,14 @@ class Navigator(BasicNavigator):
         # plt.show()
         self.get_logger().info(f"item_position {item_position}")
         
-        print(selected_cspace_idx.shape)
-        print(selected_cspace_idx[:,0].shape)
+        # print(selected_cspace_idx.shape)
+        # print(selected_cspace_idx[:,0].shape)
 
         costmap_reduced = np.zeros_like(costmap)
         costmap_reduced[selected_cspace_idx] = costmap[selected_cspace_idx]
 
                
-        print(costmap_reduced.shape)
+        # print(costmap_reduced.shape)
         costs = []
         line_params_list = []
 
@@ -277,14 +393,14 @@ class Navigator(BasicNavigator):
             if line_config_overlap < line_overlap_threshold: #allowing for some overlapping to make it more stable 
                 cost = np.sqrt(np.sum((initial_position-known_intersect)**2)) + line_config_overlap
                 # use this plotting for debug in case os weird waypoint selection 
-                plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8))
-                plt.title(f"overlap with range {line_config_overlap}")
-                plt.show()
+                # plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8))
+                # plt.title(f"overlap with range {line_config_overlap}")
+                # plt.show()
                 costs.append(cost)
             else:
-                plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8), cmap="plasma")
-                plt.title(f"too much overlap {line_config_overlap}")
-                plt.show()
+                # plt.imshow(line_idx.astype(np.uint8) + costmap_idx.astype(np.uint8), cmap="plasma")
+                # plt.title(f"too much overlap {line_config_overlap}")
+                # plt.show()
                 #
                 costs.append(np.inf)
             
@@ -292,7 +408,7 @@ class Navigator(BasicNavigator):
             raise Error("no viable grasping paths found :(")
 
 
-        print(np.array(costs))
+        # print(np.array(costs))
 
         best_values = trial_values[np.argmin(np.array(costs))]
 
@@ -405,100 +521,90 @@ class Navigator(BasicNavigator):
 
 
 
-        
-
-
-
         except Exception as e: 
             self.get_logger().warn(e)
 
 
 
-
-
-
-
-
-
 def main():
     rclpy.init()
-    navigator = Navigator()
-    navigator.waitUntilNav2Active()
-    navigator.get_logger().info(f"setting the inital_pose {navigator.initial_pose_l}")
-    x, y, w, z = navigator.initial_pose_l
-    navigator.setInitialPose(navigator.cast_waypoint(x, y, w, z))
-
-    item_tf = navigator.get_latest_tf()
-    
-    while type(navigator.costmap) == bool:
-        time.sleep(0.5)
-        navigator.waitUntilNav2Active()
-
-    grasping_waypoints =navigator.generate_waypoints(initial_position=np.array([navigator.initial_pose_l[0], navigator.initial_pose_l[1]]),
-                                                     item_position= np.array([item_tf.transform.translation.x, item_tf.transform.translation.y]),
-                                                     costmap= navigator.costmap,
-                                                     goal_pose= np.array([navigator.goal_pose[0], navigator.goal_pose[1]])
-                                                     )
-    navigator.grasping_waypoints=grasping_waypoints
-    navigator.get_logger().info(f"generated the waypoints: \n{grasping_waypoints}")
-    waypoints = []
-
-    for waypoint in grasping_waypoints:
-        waypoints.append(waypoint)
-    
-    x, y, w, z = navigator.goal_pose
-    
-    goal_waypoint = navigator.cast_waypoint(x,y,z,w)
-    waypoints.append(goal_waypoint)
-    
-    # navigator.goThroughPoses(waypoints, behavior_tree=navigator.behavior_tree_path)
-    
-
-    path = navigator.getPathThroughPoses(navigator.initial_pose, waypoints)
-    # path = navigator.getPathThroughPoses(navigator.initial_pose, [navigator.cast_waypoint(1.0, 0.5, 0.0, 1.0), navigator.cast_waypoint(2.0, 0.5, 0.0, 1.0)]) 
-    # navigator.get_logger().info(f"path computed:{path}")
-    
-    smoothed_path = navigator.smoothPath(path)
-
-    grasping_path = navigator.snip_grasping_path(grasping_waypoints[0], grasping_waypoints[1], smoothed_path)
-   
-    navigator.initiate_path_position_state_publisher()
-
-    navigator.grasping_path_publisher.publish(grasping_path)
-
-    # navigator.publish_path(grasping_path, 'grasping_path')
-
-    # Follow path
-    navigator.followPath(smoothed_path)
-
-    i = 0
-    while not navigator.isTaskComplete():
-        ################################################
-        #
-        # Implement some code here for your application!
-        #
-        ################################################
-
-        # Do something with the feedback
-        i += 1
-        feedback = navigator.getFeedback()
-        if feedback and i % 5 == 0:
-            print(f"raw feedback {feedback}")
-            print('Estimated distance remaining to goal position: ' +
-                  '{0:.3f}'.format(feedback.distance_to_goal) +
-                  '\nCurrent speed of the robot: ' +
-                  '{0:.3f}'.format(feedback.speed))
-
-    # Do something depending on the return code
-    result = navigator.getResult()
-    if result == TaskResult.SUCCEEDED:
-        print('Goal succeeded!')
-    elif result == TaskResult.CANCELED:
-        print('Goal was canceled!')
-    elif result == TaskResult.FAILED:
-        print('Goal failed!')
-    else:
-        print('Goal has an invalid return status!')
+    navigator = GraspingNavigator()
+    rclpy.spin(navigator)
+   #  navigator.get_logger().info(f"setting the inital_pose {navigator.initial_pose_l}")
+   #  x, y, w, z = navigator.initial_pose_l
+   #  navigator.setInitialPose(navigator.cast_waypoint(x, y, w, z))
+   #
+   #  item_tf = navigator.get_latest_tf()
+   #  
+   #  while type(navigator.costmap) == bool:
+   #      time.sleep(0.5)
+   #      navigator.waitUntilNav2Active()
+   #
+   #  grasping_waypoints =navigator.generate_waypoints(initial_position=np.array([navigator.initial_pose_l[0], navigator.initial_pose_l[1]]),
+   #                                                   item_position= np.array([item_tf.transform.translation.x, item_tf.transform.translation.y]),
+   #                                                   costmap= navigator.costmap,
+   #                                                   goal_pose= np.array([navigator.goal_pose[0], navigator.goal_pose[1]])
+   #                                                   )
+   #  navigator.grasping_waypoints=grasping_waypoints
+   #  navigator.get_logger().info(f"generated the waypoints: \n{grasping_waypoints}")
+   #  waypoints = []
+   #
+   #  for waypoint in grasping_waypoints:
+   #      waypoints.append(waypoint)
+   #  
+   #  x, y, w, z = navigator.goal_pose
+   #  
+   #  goal_waypoint = navigator.cast_waypoint(x,y,z,w)
+   #  waypoints.append(goal_waypoint)
+   #  
+   #  # navigator.goThroughPoses(waypoints, behavior_tree=navigator.behavior_tree_path)
+   #  
+   #
+   #  path = navigator.getPathThroughPoses(navigator.initial_pose, waypoints)
+   #  # path = navigator.getPathThroughPoses(navigator.initial_pose, [navigator.cast_waypoint(1.0, 0.5, 0.0, 1.0), navigator.cast_waypoint(2.0, 0.5, 0.0, 1.0)]) 
+   #  # navigator.get_logger().info(f"path computed:{path}")
+   #  
+   #  smoothed_path = navigator.smoothPath(path)
+   #
+   #  grasping_path = navigator.snip_grasping_path(grasping_waypoints[0], grasping_waypoints[1], smoothed_path)
+   # 
+   #  navigator.initiate_path_position_state_publisher()
+   #
+   #  navigator.grasping_path_publisher.publish(grasping_path)
+   #
+   #  # navigator.publish_path(grasping_path, 'grasping_path')
+   #
+   #  # Follow path
+   #  navigator.followPath(smoothed_path)
+   #
+   #  i = 0
+   #  while not navigator.isTaskComplete():
+   #      ################################################
+   #      #
+   #      # Implement some code here for your application!
+   #      #
+   #      ################################################
+   #
+   #      # Do something with the feedback
+   #      i += 1
+   #      feedback = navigator.getFeedback()
+   #      if feedback and i % 5 == 0:
+   #          print(f"raw feedback {feedback}")
+   #          print('Estimated distance remaining to goal position: ' +
+   #                '{0:.3f}'.format(feedback.distance_to_goal) +
+   #                '\nCurrent speed of the robot: ' +
+   #                '{0:.3f}'.format(feedback.speed))
+   #
+   #  # Do something depending on the return code
+   #  result = navigator.getResult()
+   #  if result == TaskResult.SUCCEEDED:
+   #      print('Goal succeeded!')
+   #  elif result == TaskResult.CANCELED:
+   #      print('Goal was canceled!')
+   #  elif result == TaskResult.FAILED:
+   #      print('Goal failed!')
+   #  else:
+   #      print('Goal has an invalid return status!')
 
 
 

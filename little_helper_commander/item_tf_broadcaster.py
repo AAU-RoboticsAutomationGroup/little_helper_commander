@@ -7,6 +7,7 @@ from tf2_ros import TransformBroadcaster
 import tf2_ros
 from tf2_msgs.msg import TFMessage
 from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import PointStamped
 
 
 
@@ -21,11 +22,11 @@ class ItemTFBroadcaster(Node):
         self.item_tf = TransformStamped()
         self.item_tf.child_frame_id = "item"
         self.item_tf.header.frame_id = "map"
-        self.declare_parameter('item_position', rclpy.Parameter.Type.DOUBLE_ARRAY)
-        item_initial_position = self.get_parameter('item_position').value
-        self.item_tf.transform.translation.x = item_initial_position[0]
-        self.item_tf.transform.translation.y = item_initial_position[1]
-        self.item_tf.transform.translation.z = item_initial_position[2]
+        # self.declare_parameter('item_position', rclpy.Parameter.Type.DOUBLE_ARRAY)
+        # item_initial_position = self.get_parameter('item_position').value
+        # self.item_tf.transform.translation.x = item_initial_position[0]
+        # self.item_tf.transform.translation.y = item_initial_position[1]
+        # self.item_tf.transform.translation.z = item_initial_position[2]
 
         self.tf_broadcaster = TransformBroadcaster(self)
         self.tf_buffer = tf2_ros.Buffer() 
@@ -34,8 +35,16 @@ class ItemTFBroadcaster(Node):
         self.parent_frame_id = "map"
         self.child_frame_id = "item"
 
+        self.item_point_sub = self.create_subscription(PointStamped, "item_position", self.item_point_callback, 10)
 
         self.timer = self.create_timer(0.1, self.timer_callback)
+
+    def item_point_callback(self, item_point_msg):
+        "update item tf from item point"
+        self.item_tf.transform.translation.x = item_point_msg.point.x
+        self.item_tf.transform.translation.y = item_point_msg.point.y 
+        self.item_tf.transform.translation.z = 1.0 
+        
 
     def timer_callback(self):
         try: 
