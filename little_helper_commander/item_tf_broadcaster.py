@@ -37,27 +37,42 @@ class ItemTFBroadcaster(Node):
 
         self.item_point_sub = self.create_subscription(PointStamped, "item_position", self.item_point_callback, 10)
 
-        self.timer = self.create_timer(0.1, self.timer_callback)
+        
+        self.timer_activated = False 
 
     def item_point_callback(self, item_point_msg):
+        self.get_logger().info(f"updating item position transform {item_point_msg}")
         "update item tf from item point"
         self.item_tf.transform.translation.x = item_point_msg.point.x
         self.item_tf.transform.translation.y = item_point_msg.point.y 
         self.item_tf.transform.translation.z = 1.0 
+
+        if not self.timer_activated: 
+            self.timer = self.create_timer(0.1, self.timer_callback)
+            self.timer_activated = True
+
         
 
     def timer_callback(self):
+
+        was_success = False
+
         try: 
             tf_stamped = self.tf_buffer.lookup_transform(self.parent_frame_id, self.child_frame_id, rclpy.time.Time())
             # print(f"transform recived \n ----- \n{self.cast_tf_matrix(tf_stamped.transform)} \n -----")
-            self.item_tf = tf_stamped
-        except Exception as e:
-            print(e)
+            # self.item_tf = tf_stamped
+            was_success = True
 
+        except Exception as e:
+            self.get_logger().info(f"{e}")
+            was_success = False
+        
+        # if was_success:
+        # self.get_logger().info(f"publishing item position {self.item_tf.transform.translation.x, self.item_tf.transform.translation.y}")
         self.item_tf.header.stamp = self.get_clock().now().to_msg()
         self.tf_broadcaster.sendTransform(self.item_tf)
     
-        pass
+    
 
 def main():
     rclpy.init()

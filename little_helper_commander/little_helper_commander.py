@@ -3,7 +3,7 @@
 #std python packages 
 from locale import Error
 from logging import raiseExceptions
-from typing import List, cast
+from typing import FrozenSet, List, cast
 from action_msgs.msg import GoalStatus
 import numpy as np 
 import time 
@@ -32,7 +32,10 @@ import tf2_ros
 from tf2_msgs.msg import TFMessage
 from geometry_msgs.msg import TransformStamped
 
-from lh_interfaces 
+from lh_interfaces.msg import PathStatus
+
+
+
 
 
 try:
@@ -100,7 +103,7 @@ class GraspingNavigator(Node):
         self.pre_grasp_reached_state_publisher = self.create_publisher(std_msgs.msg.Bool, "pre_grasp_state", 10)
         self.post_grasp_reached_state_publisher = self.create_publisher(std_msgs.msg.Bool, "post_grasp_state", 10)
 
-        self.grasping_path_state_publisher = self.create_publisher()
+        self.grasping_path_state_publisher = self.create_publisher(PathStatus, "grasping_path_status", 10)
 
         self.grasping_waypoints = False
 
@@ -190,6 +193,9 @@ class GraspingNavigator(Node):
         
         # creates a timer callback 
         self.initiate_path_position_state_publisher()
+
+        self.pre_grasp_reached = False
+        self.post_grasp_reached = False
 
         self.get_logger().info("path generated !!!")
 
@@ -489,25 +495,56 @@ class GraspingNavigator(Node):
     def initiate_path_position_state_publisher(self):
         self.robot_state_time = self.create_timer(0.1, self.robot_path_state_timer_callback)
 
+    def find_path_index(self, path, position):
+
+        x_arr = []
+        y_arr = []
+        for pose in path.poses:
+    
+            x_arr.append(pose.pose.position.x)
+            y_arr.append(pose.pose.position.y)
+
+        x_arr = np.array(x_arr)
+        y_arr = np.array(y_arr)
+
+        pos_x = position[0]
+        pos_y = position[1]
+        
+        dist_arr = np.sqrt((x_arr - pos_x)**2 + (y_arr - pos_y)**2)
+
+        
+        if dist_arr.shape[0] == 0:
+            return 0
+        else:
+            self.get_logger().info(f"computed the distances to all the path indecies {dist_arr}")
+
+            return int(np.argmin(dist_arr))
+
+
         
     def robot_path_state_timer_callback(self):
         def distance(a, b):
             return np.sum(np.sqrt((a-b)**2))
         
         grasping_waypoints = self.grasping_waypoints
+        path_status_msg = PathStatus()    
+        
 
         try:
             robot_position = self.tf_buffer.lookup_transform(self.parent_frame_id, self.robot_base_frame_id, rclpy.time.Time())
+            
             robot_coor = np.array([robot_position.transform.translation.x, robot_position.transform.translation.y])
             pre_grasp_coor = np.array([grasping_waypoints[0].pose.position.x, grasping_waypoints[0].pose.position.y])
             post_grasp_coor = np.array([grasping_waypoints[1].pose.position.x, grasping_waypoints[1].pose.position.y])
 
             distance_to_pre_grasp = distance(robot_coor, pre_grasp_coor)
             distance_to_post_grasp = distance(robot_coor, post_grasp_coor)
-            if distance_to_pre_grasp < 0.4:
+            if distance_to_pre_grasp < 0.2:
                 self.pre_grasp_reached = True 
-            if distance_to_post_grasp < 0.4:
+                self.post_grasp_reached = False
+            if distance_to_post_grasp < 0.3:
                 self.post_grasp_reaced = True
+                self.pre_grasp_reached = False
             
             self.get_logger().info(f"{distance_to_pre_grasp}")
             pre_grasp_msg = std_msgs.msg.Bool()
@@ -519,6 +556,12 @@ class GraspingNavigator(Node):
             self.pre_grasp_reached_state_publisher.publish(pre_grasp_msg)
             self.post_grasp_reached_state_publisher.publish(post_grasp_msg)
 
+            
+            path_status_msg.current_path_index = self.find_path_index(self.grasping_path, robot_coor)
+            path_status_msg.trigger = self.pre_grasp_reached and not self.post_grasp_reached 
+            path_status_msg.header.stamp = self.get_clock().now().to_msg()
+
+            self.grasping_path_state_publisher.publish(path_status_msg)
 
 
         except Exception as e: 
