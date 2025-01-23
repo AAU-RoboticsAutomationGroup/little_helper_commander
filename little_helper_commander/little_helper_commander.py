@@ -330,7 +330,7 @@ class GraspingNavigator(Node):
 
         cspace_radius = radius + 0.1 # the area to look for overlapping with cspace 
         
-        pickup_path_length = radius*1.8 # the pickup_path_length ie how far the robot should go in a straight line 
+        pickup_path_length = radius*1.3 # the pickup_path_length ie how far the robot should go in a straight line 
 
         path_line_with = 0.05 # the with of the line used to check for overlapping with the cspace 
 
@@ -512,7 +512,7 @@ class GraspingNavigator(Node):
         
         dist_arr = np.sqrt((x_arr - pos_x)**2 + (y_arr - pos_y)**2)
 
-        
+
         if dist_arr.shape[0] == 0:
             return 0
         else:

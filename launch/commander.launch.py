@@ -5,7 +5,7 @@ from launch.actions import DeclareLaunchArgument, declare_launch_argument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-from little_helper_commander import item_tf_broadcaster
+from little_helper_commander import item_tf_broadcaster, velocity_estimator
 
 def generate_launch_description():
 
@@ -25,4 +25,8 @@ def generate_launch_description():
                                executable="item_tf_broadcaster",
                                output="screen")
 
-    return LaunchDescription([declare_bt_path, commander, item_tf_broadcaster])
+    velocity_estimator = Node(package="little_helper_commander",
+                              executable="velocity_estimator",
+                              output="screen")
+
+    return LaunchDescription([declare_bt_path, commander, item_tf_broadcaster, velocity_estimator])
