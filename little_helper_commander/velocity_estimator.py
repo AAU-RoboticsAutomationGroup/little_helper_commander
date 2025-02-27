@@ -26,8 +26,8 @@ def get_yaw(tf):
 class VelocityEstimator(Node):
     def __init__(self, node_name="velocity_estimator"):
         super().__init__(node_name)
-        self.child_frame_id = "ur5_base_link"
-        self.parent_frame_id = "map"
+        self.child_frame_id = "item"
+        self.parent_frame_id = "ur5_base_link"
         
         self.tf_buffer = tf2_ros.Buffer() 
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
@@ -96,8 +96,8 @@ class VelocityEstimator(Node):
 
                 vel_msg = TwistStamped()
 
-                # vel_msg.header.stamp = self.get_clock().now().to_msg() 
-                vel_msg.header.frame_id = self.parent_frame_id 
+                vel_msg.header.frame_id = self.parent_frame_id
+                # vel_msg.header.stamp = self.get_clock().now().to_msg()
 
                 vel_msg.twist.linear.x = vel[0]
                 vel_msg.twist.linear.y = vel[1]
