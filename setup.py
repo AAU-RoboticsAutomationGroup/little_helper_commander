@@ -24,7 +24,8 @@ setup(
         'console_scripts': [
             'commander = little_helper_commander.little_helper_commander:main',
             'item_tf_broadcaster = little_helper_commander.item_tf_broadcaster:main',
-            'velocity_estimator = little_helper_commander.velocity_estimator:main' 
+            'velocity_estimator = little_helper_commander.velocity_estimator:main',
+            'speed_limiter = little_helper_commander.grasping_path_speed_limit:main'
         ],
 
     },
