@@ -2,6 +2,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, declare_launch_argument
+from launch.descriptions import executable
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -28,5 +29,8 @@ def generate_launch_description():
     velocity_estimator = Node(package="little_helper_commander",
                               executable="velocity_estimator",
                               output="screen")
+    speed_limiter = Node(package="little_helper_commander",
+                         executable="speed_limiter",
+                         output="screen")
 
-    return LaunchDescription([declare_bt_path, commander, item_tf_broadcaster, velocity_estimator])
+    return LaunchDescription([declare_bt_path, commander, item_tf_broadcaster, velocity_estimator, speed_limiter])
