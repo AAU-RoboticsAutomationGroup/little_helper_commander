@@ -39,15 +39,10 @@ from lh_interfaces.msg import PathStatus
 
 
 
-
-
 try:
     import matplotlib.pyplot as plt
 except Exception as e:
     print(e)
-
-
-
 
 
 class GraspingNavigator(Node):
@@ -111,6 +106,7 @@ class GraspingNavigator(Node):
         self.post_grasp_reached_state_publisher = self.create_publisher(std_msgs.msg.Bool, "post_grasp_state", 10)
 
         self.grasping_path_state_publisher = self.create_publisher(PathStatus, "grasping_path_status", 10)
+        
 
         self.grasping_waypoints = False
 
@@ -127,6 +123,8 @@ class GraspingNavigator(Node):
         self.waypoints = []
         self.path = []
         self.grasping_paths = []
+
+        self.action_point_publisher = self.create_publisher(PointStamped, "item_position", 10)
 
 
     def webui_weypoints_callback(self, webui_waypoints):
@@ -180,10 +178,13 @@ class GraspingNavigator(Node):
                 else:
                     pre_wp = self.waypoints[-1] 
                 
+                self.webui_publish_action_point([data_point['xm'], data_point['ym']])
+
                 pre_pos = [pre_wp.pose.position.x, pre_wp.pose.position.y]
                 item_pos = [point.pose.position.x, point.pose.position.y]
 
                 grasping_waypoints = self.generate_waypoints_from_coordinates(pre_pos, item_pos)
+                self.grasping_waypoints = grasping_waypoints 
                 self.waypoints += grasping_waypoints
                 for wp, part in zip(grasping_waypoints, ['start', 'end']):
                     annotated_waypoint = {'type':data_point['type']+part, 'waypoint':wp}
@@ -193,11 +194,15 @@ class GraspingNavigator(Node):
             elif data_point['type'] == "dropoff":
                 pre_wp = self.waypoints[-1] 
                 
+                self.webui_publish_action_point([data_point['xm'], data_point['ym']])
+
                 pre_pos = [pre_wp.pose.position.x, pre_wp.pose.position.y]
                 item_pos = [point.pose.position.x, point.pose.position.y]
 
                 grasping_waypoints = self.generate_waypoints_from_coordinates(pre_pos, item_pos)
                 
+                self.grasping_waypoints = grasping_waypoints 
+
                 for wp, part in zip(grasping_waypoints, ['start', 'end']):
                     annotated_waypoint = {'type':data_point['type']+part, 'waypoint':wp}
                     annotated_waypoints.append(annotated_waypoint)
@@ -231,9 +236,19 @@ class GraspingNavigator(Node):
         self.get_logger().info(f"recived move trigger signal from webui {msg.data}")
         if msg.data and len(self.path) != 0:
             # creates a timer callback 
-            self.initiate_path_position_state_publisher()
+            if self.grasping_waypoints:
+                self.initiate_path_position_state_publisher()
+
             self.basic_navigator.followPath(self.path[-1])
             
+
+    def webui_publish_action_point(self, point_coords):
+        msg = PointStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = "map"
+        msg.point.x = point_coords[0]
+        msg.point.y = point_coords[1]
+        self.action_point_publisher.publish(msg)
 
 
 
@@ -700,7 +715,7 @@ class GraspingNavigator(Node):
         if dist_arr.shape[0] == 0:
             return 0
         else:
-            self.get_logger().info(f"computed the distances to all the path indecies {dist_arr}")
+            self.get_logger().debug(f"computed the distances to all the path indecies {dist_arr}")
 
             return int(np.argmin(dist_arr))
 
@@ -730,7 +745,7 @@ class GraspingNavigator(Node):
                 self.post_grasp_reaced = True
                 self.pre_grasp_reached = False
             
-            self.get_logger().info(f"{distance_to_pre_grasp}")
+            self.get_logger().debug(f"{distance_to_pre_grasp}")
             pre_grasp_msg = std_msgs.msg.Bool()
             pre_grasp_msg.data = self.pre_grasp_reached
 
