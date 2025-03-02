@@ -170,7 +170,10 @@ class GraspingNavigator(Node):
                 self.waypoints.append(waypoint)
                 annotated_waypoint = {'type':data_point['type'], 'waypoint':waypoint}
                 annotated_waypoints.append(annotated_waypoint)
-
+            elif data_point['type'] == "waypoint":
+                self.waypoints.append(waypoint)
+                annotated_waypoint = {'type':data_point['type'], 'waypoint':waypoint}
+                annotated_waypoints.append(annotated_waypoint)
             elif data_point['type'] == "collect":
                 if len(self.waypoints) == 0:
                     pre_wp = self.initial_pose
