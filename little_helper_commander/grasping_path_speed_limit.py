@@ -18,14 +18,14 @@ class SpeedLimiter(Node):
         self.speed_limit_publisher = self.create_publisher(SpeedLimit, "/speed_limit", 10)
 
     def grasping_path_status_callback(self, msg : PathStatus):
-        self.get_logger().info("grasping path status recieved")
+        self.get_logger().debug("grasping path status recieved")
         if msg.trigger: 
             self.speed_limit_publisher.publish(self.speed_limit)
-            self.get_logger().info(f'Published Speed Limit: {self.speed_limit.speed_limit} m/s')
+            self.get_logger().debug(f'Published Speed Limit: {self.speed_limit.speed_limit} m/s')
 
         else:
             self.speed_limit_publisher.publish(self.higher_speed_limit)
-            self.get_logger().info(f'Published Speed Limit: {self.higher_speed_limit.speed_limit} m/s')
+            self.get_logger().debug(f'Published Speed Limit: {self.higher_speed_limit.speed_limit} m/s')
 
 
 def main():

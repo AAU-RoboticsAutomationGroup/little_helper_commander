@@ -87,7 +87,7 @@ class VelocityEstimator(Node):
                         yaw_vel += d_yaw / d_time
                         n += 1
                     except Exception as e:
-                        self.get_logger().warn(f'{e}')
+                        self.get_logger().debug(f'{e}')
 
                 vel = vel/n 
                 yaw_vel = yaw_vel/n 
@@ -108,7 +108,7 @@ class VelocityEstimator(Node):
 
                 self.vel_pub.publish(vel_msg)
         except Exception as e:
-            self.get_logger().warn(f'2 {e}')
+            self.get_logger().debug(f'2 {e}')
 
 def main():
     rclpy.init()
