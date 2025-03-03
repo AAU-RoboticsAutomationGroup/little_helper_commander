@@ -133,6 +133,8 @@ class GraspingNavigator(Node):
         data_list = ast.literal_eval(webui_waypoints.data)
         self.waypoints = []
         annotated_waypoints = [] 
+        self.pre_grasp_reached = False
+        self.post_grasp_reached = False
         for data_point in data_list:
             point = PoseStamped()
             self.get_logger().info(f"datapoint {data_point}")
@@ -538,8 +540,8 @@ class GraspingNavigator(Node):
         item_position = self.item_position
         initial_position = np.array([self.initial_pose.pose.position.x, self.initial_pose.pose.position.y])
 
-        trial_resolution = 50 #the amount of points on the radius to try 
-        distance_to_center = 0.6
+        trial_resolution = 100 #the amount of points on the radius to try 
+        distance_to_center = 0.65
         radius = 1.5 # the radius from the item to generate trial points 
         attack_angle = np.arcsin(distance_to_center/radius)*180/np.pi + 180 # the angle to the line perpendicular to the tangent of the trial value,
         self.get_logger().info(f"attack angle = {attack_angle}")
