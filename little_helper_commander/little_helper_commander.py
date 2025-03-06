@@ -132,31 +132,34 @@ class GraspingNavigator(Node):
         self._action_client = ActionClient(self, FollowJointTrajectory, '/scaled_joint_trajectory_controller/follow_joint_trajectory')
  
     def send_manipulator_goal(self):
-        goal_msg = FollowJointTrajectory.Goal()
+        try:
+            goal_msg = FollowJointTrajectory.Goal()
 
-        # Define the joint names
-        goal_msg.trajectory.joint_names = [
-            "shoulder_pan_joint",
-            "shoulder_lift_joint",
-            "elbow_joint",
-            "wrist_1_joint",
-            "wrist_2_joint",
-            "wrist_3_joint"
-        ]
+            # Define the joint names
+            goal_msg.trajectory.joint_names = [
+                "shoulder_pan_joint",
+                "shoulder_lift_joint",
+                "elbow_joint",
+                "wrist_1_joint",
+                "wrist_2_joint",
+                "wrist_3_joint"
+            ]
 
-        # Define a trajectory point
-        point = JointTrajectoryPoint()
-        #point.positions = [0.1415, -1.0, 2.0, -1.5, 1.0, 0.5]  # example positions
-        point.positions = [0.1415, -1.3, 1.0, -1.5, -1.5, -1.1]  # example positions
+            # Define a trajectory point
+            point = JointTrajectoryPoint()
+            #point.positions = [0.1415, -1.0, 2.0, -1.5, 1.0, 0.5]  # example positions
+            point.positions = [0.1415, -1.3, 1.0, -1.5, -1.5, -1.1]  # example positions
 
-        point.time_from_start = rclpy.duration.Duration(seconds=2.0).to_msg()  # 2 seconds
+            point.time_from_start = rclpy.duration.Duration(seconds=2.0).to_msg()  # 2 seconds
 
-        # Add the point to the trajectory
-        goal_msg.trajectory.points.append(point)
+            # Add the point to the trajectory
+            goal_msg.trajectory.points.append(point)
 
-        self._action_client.wait_for_server()
-        self._send_goal_future = self._action_client.send_goal_async(goal_msg, feedback_callback=self.feedback_callback)
-        self._send_goal_future.add_done_callback(self.goal_response_callback)
+            self._action_client.wait_for_server()
+            self._send_goal_future = self._action_client.send_goal_async(goal_msg, feedback_callback=self.feedback_callback)
+            self._send_goal_future.add_done_callback(self.goal_response_callback)
+        except:
+            self.get_logger().info("got some error when trying to configure manipulator")
 
     def goal_response_callback(self, future):
         goal_handle = future.result()
@@ -186,7 +189,7 @@ class GraspingNavigator(Node):
         annotated_waypoints = [] 
         self.pre_grasp_reached = False
         self.post_grasp_reached = False
-        self.send_manipulator_goal()
+        #self.send_manipulator_goal()
         for data_point in data_list:
             point = PoseStamped()
             self.get_logger().info(f"datapoint {data_point}")

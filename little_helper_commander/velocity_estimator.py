@@ -44,7 +44,7 @@ class VelocityEstimator(Node):
         # except Exception as e:
         #     self.get_logger().warn(f'1 {e}')     
         # try:
-            if len(self.base_tf_list) < 9:
+            if len(self.base_tf_list) < 50:
                 self.base_tf_list.append(tf_stamped)
             else:
                 init_time = Time.from_msg(self.base_tf_list[0].header.stamp).nanoseconds
